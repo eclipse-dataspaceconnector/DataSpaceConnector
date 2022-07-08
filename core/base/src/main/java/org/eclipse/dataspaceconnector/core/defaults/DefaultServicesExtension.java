@@ -16,6 +16,7 @@ package org.eclipse.dataspaceconnector.core.defaults;
 
 import org.eclipse.dataspaceconnector.common.concurrency.LockManager;
 import org.eclipse.dataspaceconnector.core.defaults.assetindex.InMemoryAssetIndex;
+import org.eclipse.dataspaceconnector.core.defaults.certificateresolver.DefaultCertificateResolver;
 import org.eclipse.dataspaceconnector.core.defaults.contractdefinition.InMemoryContractDefinitionStore;
 import org.eclipse.dataspaceconnector.core.defaults.negotiationstore.InMemoryContractNegotiationStore;
 import org.eclipse.dataspaceconnector.core.defaults.policystore.InMemoryPolicyDefinitionStore;
@@ -27,6 +28,8 @@ import org.eclipse.dataspaceconnector.spi.asset.DataAddressResolver;
 import org.eclipse.dataspaceconnector.spi.contract.negotiation.store.ContractNegotiationStore;
 import org.eclipse.dataspaceconnector.spi.contract.offer.store.ContractDefinitionStore;
 import org.eclipse.dataspaceconnector.spi.policy.store.PolicyDefinitionStore;
+import org.eclipse.dataspaceconnector.spi.security.CertificateResolver;
+import org.eclipse.dataspaceconnector.spi.security.Vault;
 import org.eclipse.dataspaceconnector.spi.system.Provider;
 import org.eclipse.dataspaceconnector.spi.system.ServiceExtension;
 import org.eclipse.dataspaceconnector.spi.system.ServiceExtensionContext;
@@ -92,6 +95,12 @@ public class DefaultServicesExtension implements ServiceExtension {
     public TransactionContext defaultTransactionContext(ServiceExtensionContext context) {
         context.getMonitor().warning("No TransactionContext registered, a no-op implementation will be used, not suitable for production environments");
         return new NoopTransactionContext();
+    }
+
+    @Provider(isDefault = true)
+    public CertificateResolver defaultCertificateResolver(ServiceExtensionContext context) {
+        var vault = context.getService(Vault.class);
+        return new DefaultCertificateResolver(vault);
     }
 
     private ContractDefinitionStore getContractDefinitionStore() {
