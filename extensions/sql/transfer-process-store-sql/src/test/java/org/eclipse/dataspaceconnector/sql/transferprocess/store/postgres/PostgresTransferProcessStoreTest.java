@@ -17,7 +17,6 @@ package org.eclipse.dataspaceconnector.sql.transferprocess.store.postgres;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import org.eclipse.dataspaceconnector.common.util.junit.annotations.PostgresqlDbIntegrationTest;
 import org.eclipse.dataspaceconnector.common.util.postgres.PostgresqlLocalInstance;
 import org.eclipse.dataspaceconnector.policy.model.PolicyRegistrationTypes;
@@ -632,7 +631,6 @@ class PostgresTransferProcessStoreTest {
     @JsonDeserialize(builder = TestResourceDef.Builder.class)
     static class TestResourceDef extends ResourceDefinition {
 
-        @JsonPOJOBuilder(withPrefix = "")
         public static class Builder extends ResourceDefinition.Builder<TestResourceDef, Builder> {
             private Builder() {
                 super(new TestResourceDef());
@@ -649,7 +647,6 @@ class PostgresTransferProcessStoreTest {
     @JsonTypeName("dataspaceconnector:testprovisionedresource")
     static class TestProvisionedResource extends ProvisionedResource {
 
-        @JsonPOJOBuilder(withPrefix = "")
         public static class Builder extends ProvisionedResource.Builder<TestProvisionedResource, Builder> {
             private Builder() {
                 super(new TestProvisionedResource());
