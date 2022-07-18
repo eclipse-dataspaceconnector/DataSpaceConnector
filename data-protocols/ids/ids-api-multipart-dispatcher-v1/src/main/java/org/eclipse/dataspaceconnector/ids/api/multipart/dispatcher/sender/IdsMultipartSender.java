@@ -65,12 +65,13 @@ import static java.util.concurrent.CompletableFuture.failedFuture;
  */
 abstract class IdsMultipartSender<M extends RemoteMessage, R> implements IdsMessageSender<M, R> {
     private static final String TOKEN_SCOPE = "idsc:IDS_CONNECTOR_ATTRIBUTES_ALL";
+
     private final URI connectorId;
     private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
     private final Monitor monitor;
     private final IdentityService identityService;
     private final IdsTransformerRegistry transformerRegistry;
+    private final ObjectMapper objectMapper;
 
     protected IdsMultipartSender(@NotNull String connectorId,
                                  @NotNull OkHttpClient httpClient,
@@ -80,10 +81,10 @@ abstract class IdsMultipartSender<M extends RemoteMessage, R> implements IdsMess
                                  @NotNull IdsTransformerRegistry transformerRegistry) {
         this.connectorId = createConnectorIdUri(Objects.requireNonNull(connectorId, "connectorId"));
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient");
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
         this.monitor = Objects.requireNonNull(monitor, "monitor");
         this.identityService = Objects.requireNonNull(identityService, "identityService");
         this.transformerRegistry = Objects.requireNonNull(transformerRegistry, "transformerRegistry");
+        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper");
     }
 
     private static URI createConnectorIdUri(String connectorId) {
@@ -145,8 +146,7 @@ abstract class IdsMultipartSender<M extends RemoteMessage, R> implements IdsMess
 
         RequestBody headerRequestBody;
         try {
-            headerRequestBody = RequestBody.create(
-                    objectMapper.writeValueAsString(message),
+            headerRequestBody = RequestBody.create(objectMapper.writeValueAsString(message),
                     okhttp3.MediaType.get(MediaType.APPLICATION_JSON));
         } catch (IOException exception) {
             return failedFuture(exception);

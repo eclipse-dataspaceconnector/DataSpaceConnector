@@ -50,7 +50,6 @@ import static org.eclipse.dataspaceconnector.ids.spi.IdsConstants.IDS_WEBHOOK_AD
  * expects an IDS RequestInProcessMessage as the response.
  */
 public class MultipartArtifactRequestSender extends IdsMultipartSender<DataRequest, String> {
-
     private final Vault vault;
     private final String idsWebhookAddress;
 
@@ -63,6 +62,7 @@ public class MultipartArtifactRequestSender extends IdsMultipartSender<DataReque
                                           @NotNull IdsTransformerRegistry transformerRegistry,
                                           @NotNull String idsWebhookAddress) {
         super(connectorId, httpClient, objectMapper, monitor, identityService, transformerRegistry);
+
         this.vault = Objects.requireNonNull(vault);
         this.idsWebhookAddress = idsWebhookAddress;
     }

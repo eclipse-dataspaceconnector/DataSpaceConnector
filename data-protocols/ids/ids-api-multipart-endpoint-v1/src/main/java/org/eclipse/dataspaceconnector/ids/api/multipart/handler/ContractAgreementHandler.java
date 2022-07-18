@@ -15,6 +15,7 @@
 package org.eclipse.dataspaceconnector.ids.api.multipart.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import de.fraunhofer.iais.eis.ContractAgreement;
 import de.fraunhofer.iais.eis.ContractAgreementMessage;
 import de.fraunhofer.iais.eis.Message;
 import org.eclipse.dataspaceconnector.ids.api.multipart.message.MultipartRequest;
@@ -72,9 +73,9 @@ public class ContractAgreementHandler implements Handler {
 
         var message = (ContractAgreementMessage) multipartRequest.getHeader();
 
-        de.fraunhofer.iais.eis.ContractAgreement contractAgreement;
+        ContractAgreement contractAgreement;
         try {
-            contractAgreement = objectMapper.readValue(multipartRequest.getPayload(), de.fraunhofer.iais.eis.ContractAgreement.class);
+            contractAgreement = objectMapper.readValue(multipartRequest.getPayload(), ContractAgreement.class);
         } catch (IOException e) {
             monitor.severe("ContractAgreementHandler: Contract Agreement is invalid", e);
             return createBadParametersErrorMultipartResponse(message);

@@ -14,7 +14,6 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.fraunhofer.iais.eis.Artifact;
 import de.fraunhofer.iais.eis.BaseConnector;
@@ -97,15 +96,14 @@ public class MultipartDescriptionRequestSender extends IdsMultipartSender<Metada
      */
     @Override
     protected MultipartResponse<ModelClass> getResponseContent(IdsMultipartParts parts) throws Exception {
-        ObjectMapper objectMapper = getObjectMapper();
-
-        ResponseMessage header = objectMapper.readValue(parts.getHeader(), ResponseMessage.class);
+        var objectMapper = getObjectMapper();
+        var header = objectMapper.readValue(parts.getHeader(), ResponseMessage.class);
 
         ModelClass payload = null;
         if (parts.getPayload() != null) {
-            String payloadString = new String(parts.getPayload().readAllBytes());
-            JsonNode payloadJson = objectMapper.readTree(payloadString);
-            JsonNode type = payloadJson.get("@type");
+            var payloadString = new String(parts.getPayload().readAllBytes());
+            var payloadJson = objectMapper.readTree(payloadString);
+            var type = payloadJson.get("@type");
             switch (type.textValue()) {
                 case "ids:BaseConnector":
                     payload = objectMapper.readValue(payloadString, BaseConnector.class);

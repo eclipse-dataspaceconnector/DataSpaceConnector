@@ -19,7 +19,6 @@ package org.eclipse.dataspaceconnector.ids.api.multipart.controller;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import de.fraunhofer.iais.eis.Connector;
-import de.fraunhofer.iais.eis.DynamicAttributeToken;
 import de.fraunhofer.iais.eis.Message;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
@@ -29,7 +28,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.dataspaceconnector.ids.api.multipart.handler.Handler;
 import org.eclipse.dataspaceconnector.ids.api.multipart.message.MultipartRequest;
-import org.eclipse.dataspaceconnector.ids.api.multipart.message.MultipartResponse;
 import org.eclipse.dataspaceconnector.spi.EdcException;
 import org.eclipse.dataspaceconnector.spi.iam.ClaimToken;
 import org.eclipse.dataspaceconnector.spi.iam.IdentityService;
@@ -45,7 +43,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 import static java.lang.String.format;
@@ -84,36 +81,35 @@ public class MultipartController {
     }
 
     @POST
-    public Response request(@FormDataParam(HEADER) InputStream headerInputStream,
-                            @FormDataParam(PAYLOAD) String payload) {
+    public Response request(@FormDataParam(HEADER) InputStream headerInputStream, @FormDataParam(PAYLOAD) String payload) {
         if (headerInputStream == null) {
-            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId), null)).build();
         }
 
         Message header;
         try {
             header = objectMapper.readValue(headerInputStream, Message.class);
         } catch (IOException e) {
-            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId), null)).build();
         }
 
         if (header == null) {
-            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(malformedMessage(null, connectorId), null)).build();
         }
 
-        DynamicAttributeToken dynamicAttributeToken = header.getSecurityToken();
+        var dynamicAttributeToken = header.getSecurityToken();
         if (dynamicAttributeToken == null || dynamicAttributeToken.getTokenValue() == null) {
             monitor.warning("MultipartController: Token is missing in header");
-            return Response.ok(createFormDataMultiPart(notAuthenticated(header, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(notAuthenticated(header, connectorId), null)).build();
         }
 
-        Map<String, Object> additional = new HashMap<>();
-        //IDS token validation requires issuerConnector and securityProfile
+        var additional = new HashMap<String, Object>();
+        // IDS token validation requires issuerConnector and securityProfile
         additional.put("issuerConnector", header.getIssuerConnector());
         try {
             additional.put("securityProfile", objectMapper.readValue(payload, Connector.class).getSecurityProfile());
         } catch (Exception e) {
-            //payload no connector instance, nothing to do
+            // payload no connector instance, nothing to do
         }
 
         var tokenRepresentation = TokenRepresentation.Builder.newInstance()
@@ -122,10 +118,9 @@ public class MultipartController {
                 .build();
 
         Result<ClaimToken> verificationResult = identityService.verifyJwtToken(tokenRepresentation, idsWebhookAddress);
-
         if (verificationResult.failed()) {
             monitor.warning(format("MultipartController: Token validation failed %s", verificationResult.getFailure().getMessages()));
-            return Response.ok(createFormDataMultiPart(notAuthenticated(header, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(notAuthenticated(header, connectorId), null)).build();
         }
 
         var claimToken = verificationResult.getContent();
@@ -139,28 +134,21 @@ public class MultipartController {
                 .filter(h -> h.canHandle(multipartRequest))
                 .findFirst()
                 .orElse(null);
+
         if (handler == null) {
-            return Response.ok(createFormDataMultiPart(messageTypeNotSupported(header, connectorId))).build();
+            return Response.ok(createFormDataMultiPart(messageTypeNotSupported(header, connectorId), null)).build();
         }
 
-        MultipartResponse multipartResponse = handler.handleRequest(multipartRequest, claimToken);
+        var multipartResponse = handler.handleRequest(multipartRequest, claimToken);
         if (multipartResponse != null) {
-            return Response.ok(createFormDataMultiPart(multipartResponse)).build();
+            return Response.ok(createFormDataMultiPart(multipartResponse.getHeader(), multipartResponse.getPayload())).build();
         }
 
-        return Response.ok(createFormDataMultiPart(notFound(header, connectorId))).build();
-    }
-
-    private FormDataMultiPart createFormDataMultiPart(MultipartResponse multipartResponse) {
-        return createFormDataMultiPart(multipartResponse.getHeader(), multipartResponse.getPayload());
-    }
-
-    private FormDataMultiPart createFormDataMultiPart(Object header) {
-        return createFormDataMultiPart(header, null);
+        return Response.ok(createFormDataMultiPart(notFound(header, connectorId), null)).build();
     }
 
     private FormDataMultiPart createFormDataMultiPart(Object header, Object payload) {
-        FormDataMultiPart multiPart = new FormDataMultiPart();
+        var multiPart = new FormDataMultiPart();
         if (header != null) {
             multiPart.bodyPart(new FormDataBodyPart(HEADER, toJson(header), MediaType.APPLICATION_JSON_TYPE));
         }
