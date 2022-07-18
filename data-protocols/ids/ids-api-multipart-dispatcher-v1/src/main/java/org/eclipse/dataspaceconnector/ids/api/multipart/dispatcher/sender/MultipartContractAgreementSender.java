@@ -46,7 +46,6 @@ import static org.eclipse.dataspaceconnector.ids.spi.IdsConstants.IDS_WEBHOOK_AD
  * expects an IDS RequestInProcessMessage as the response.
  */
 public class MultipartContractAgreementSender extends IdsMultipartSender<ContractAgreementRequest, String> {
-
     private final String idsWebhookAddress;
 
     public MultipartContractAgreementSender(@NotNull String connectorId,

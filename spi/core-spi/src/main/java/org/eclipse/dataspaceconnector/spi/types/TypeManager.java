@@ -16,6 +16,7 @@ package org.eclipse.dataspaceconnector.spi.types;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -118,6 +119,15 @@ public class TypeManager {
         var module = new SimpleModule();
         module.addSerializer(type, serializer);
         getMapper().registerModule(module);
+    }
+
+    /**
+     * Registers a serializer for the given type with a context.
+     */
+    public <T> void registerDeserializer(String key, Class<T> type, JsonDeserializer<T> deserializer) {
+        var module = new SimpleModule();
+        module.addDeserializer(type, deserializer);
+        getMapper(key).registerModule(module);
     }
 
     /**

@@ -14,13 +14,18 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.fraunhofer.iais.eis.ArtifactRequestMessage;
 import de.fraunhofer.iais.eis.DynamicAttributeTokenBuilder;
 import okhttp3.OkHttpClient;
 import org.eclipse.dataspaceconnector.ids.spi.IdsId;
 import org.eclipse.dataspaceconnector.ids.spi.transform.IdsTransformerRegistry;
 import org.eclipse.dataspaceconnector.ids.transform.IdsProtocol;
+import org.eclipse.dataspaceconnector.serializer.types.calendar.XmlGregorianCalendarModule;
 import org.eclipse.dataspaceconnector.spi.iam.IdentityService;
 import org.eclipse.dataspaceconnector.spi.monitor.Monitor;
 import org.eclipse.dataspaceconnector.spi.result.Result;
@@ -31,6 +36,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.util.Map;
 import java.util.UUID;
 
@@ -51,14 +57,23 @@ class MultipartArtifactRequestSenderTest {
     @BeforeEach
     public void setUp() {
         var httpClient = mock(OkHttpClient.class);
-        var mapper = new ObjectMapper();
         var monitor = mock(Monitor.class);
         var vault = mock(Vault.class);
         var identityService = mock(IdentityService.class);
         String connectorId = UUID.randomUUID().toString();
         transformerRegistry = mock(IdsTransformerRegistry.class);
         idsWebhookAddress = UUID.randomUUID() + "/api/v1/ids/data";
-        sender = new MultipartArtifactRequestSender(connectorId, httpClient, mapper, monitor, vault, identityService, transformerRegistry, idsWebhookAddress);
+
+        var objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.registerModule(new XmlGregorianCalendarModule());
+        objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX"));
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+
+        sender = new MultipartArtifactRequestSender(connectorId, httpClient, objectMapper, monitor, vault, identityService, transformerRegistry, idsWebhookAddress);
     }
 
     @Test
@@ -88,6 +103,16 @@ class MultipartArtifactRequestSenderTest {
                             .containsAllEntriesOf(request.getProperties())
                             .containsEntry(IDS_WEBHOOK_ADDRESS_PROPERTY, idsWebhookAddress);
                 });
+    }
+
+    @Test
+    void buildMessagePayload() throws Exception {
+        var dataAddress = DataAddress.Builder.newInstance().type("type").build();
+        var dataRequest = DataRequest.Builder.newInstance().dataDestination(dataAddress).build();
+
+        var result = sender.buildMessagePayload(dataRequest);
+
+        assertThat(result).isNotNull();
     }
 
     private static DataRequest createRequest() {

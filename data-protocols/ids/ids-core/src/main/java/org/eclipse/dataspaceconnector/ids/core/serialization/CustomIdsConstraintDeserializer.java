@@ -12,7 +12,7 @@
  *
  */
 
-package org.eclipse.dataspaceconnector.ids.core.policy;
+package org.eclipse.dataspaceconnector.ids.core.serialization;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;

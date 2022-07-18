@@ -14,7 +14,11 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.github.javafaker.Faker;
 import de.fraunhofer.iais.eis.DynamicAttributeToken;
 import de.fraunhofer.iais.eis.Message;
@@ -22,12 +26,14 @@ import okhttp3.OkHttpClient;
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.response.IdsMultipartParts;
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.response.MultipartResponse;
 import org.eclipse.dataspaceconnector.ids.spi.transform.IdsTransformerRegistry;
+import org.eclipse.dataspaceconnector.serializer.types.calendar.XmlGregorianCalendarModule;
 import org.eclipse.dataspaceconnector.spi.iam.IdentityService;
 import org.eclipse.dataspaceconnector.spi.monitor.Monitor;
 import org.eclipse.dataspaceconnector.spi.result.Result;
 import org.eclipse.dataspaceconnector.spi.types.domain.message.RemoteMessage;
 import org.junit.jupiter.api.Test;
 
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -44,7 +50,17 @@ class IdsMultipartSenderTest {
     @Test
     void should_fail_if_token_retrieval_fails() {
         when(identityService.obtainClientCredentials(any())).thenReturn(Result.failure("error"));
-        var sender = new TestIdsMultipartSender("any", mock(OkHttpClient.class), new ObjectMapper(), mock(Monitor.class), identityService, mock(IdsTransformerRegistry.class));
+
+        var objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.registerModule(new XmlGregorianCalendarModule());
+        objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX"));
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+
+        var sender = new TestIdsMultipartSender("any", mock(OkHttpClient.class), objectMapper, mock(Monitor.class), identityService, mock(IdsTransformerRegistry.class));
 
         var result = sender.send(new TestRemoteMessage(), () -> "any");
 

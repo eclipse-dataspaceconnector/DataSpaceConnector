@@ -16,7 +16,11 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.fraunhofer.iais.eis.Contract;
 import de.fraunhofer.iais.eis.ContractAgreementMessage;
 import de.fraunhofer.iais.eis.ContractAgreementMessageBuilder;
@@ -41,10 +45,10 @@ import okhttp3.RequestBody;
 import okhttp3.Response;
 import org.eclipse.dataspaceconnector.ids.api.multipart.controller.MultipartController;
 import org.eclipse.dataspaceconnector.ids.api.multipart.message.MultipartResponse;
-import org.eclipse.dataspaceconnector.ids.core.serialization.ObjectMapperFactory;
 import org.eclipse.dataspaceconnector.ids.spi.IdsId;
 import org.eclipse.dataspaceconnector.ids.spi.IdsIdParser;
 import org.eclipse.dataspaceconnector.junit.extensions.EdcExtension;
+import org.eclipse.dataspaceconnector.serializer.types.calendar.XmlGregorianCalendarModule;
 import org.eclipse.dataspaceconnector.spi.system.ServiceExtension;
 import org.eclipse.dataspaceconnector.spi.types.domain.asset.Asset;
 import org.glassfish.jersey.media.multipart.ContentDisposition;
@@ -54,6 +58,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.net.URI;
 import java.net.http.HttpHeaders;
+import java.text.SimpleDateFormat;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -70,13 +75,7 @@ abstract class AbstractMultipartControllerIntegrationTest {
     private static final AtomicReference<Integer> PORT = new AtomicReference<>();
     private static final AtomicReference<Integer> IDS_PORT = new AtomicReference<>();
     private static final List<Asset> ASSETS = new LinkedList<>();
-    // TODO needs to be replaced by an objectmapper capable to understand IDS JSON-LD
-    //      once https://github.com/eclipse-dataspaceconnector/DataSpaceConnector/issues/236 is done
-    private static final ObjectMapper OBJECT_MAPPER;
-
-    static {
-        OBJECT_MAPPER = new ObjectMapperFactory().getObjectMapper();
-    }
+    private ObjectMapper objectMapper;
 
     @AfterEach
     void after() {
@@ -98,6 +97,15 @@ abstract class AbstractMultipartControllerIntegrationTest {
         for (Map.Entry<String, String> entry : getSystemProperties().entrySet()) {
             System.setProperty(entry.getKey(), entry.getValue());
         }
+
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.registerModule(new XmlGregorianCalendarModule());
+        objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX"));
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
 
         extension.registerSystemExtension(ServiceExtension.class, new IdsApiMultipartEndpointV1IntegrationTestServiceExtension(ASSETS));
     }
@@ -125,11 +133,11 @@ abstract class AbstractMultipartControllerIntegrationTest {
     }
 
     protected String toJson(Message message) throws Exception {
-        return OBJECT_MAPPER.writeValueAsString(message);
+        return objectMapper.writeValueAsString(message);
     }
 
     protected String toJson(Contract contract) throws Exception {
-        return OBJECT_MAPPER.writeValueAsString(contract);
+        return objectMapper.writeValueAsString(contract);
     }
 
     protected DescriptionRequestMessage getDescriptionRequestMessage() {
@@ -241,7 +249,7 @@ abstract class AbstractMultipartControllerIntegrationTest {
                 }
 
                 if (multipartName.equalsIgnoreCase(HEADER)) {
-                    header = OBJECT_MAPPER.readValue(part.body().inputStream(), Message.class);
+                    header = objectMapper.readValue(part.body().readUtf8(), Message.class);
                 } else if (multipartName.equalsIgnoreCase(PAYLOAD)) {
                     payload = part.body().readByteArray();
                 }
@@ -286,8 +294,7 @@ abstract class AbstractMultipartControllerIntegrationTest {
                 .add("Content-Disposition", "form-data; name=\"header\"")
                 .build();
 
-        RequestBody requestBody = RequestBody.create(
-                toJson(message),
+        RequestBody requestBody = RequestBody.create(toJson(message),
                 okhttp3.MediaType.get(MediaType.APPLICATION_JSON));
 
         return MultipartBody.Part.create(headers, requestBody);
@@ -299,8 +306,7 @@ abstract class AbstractMultipartControllerIntegrationTest {
                 .add("Content-Disposition", "form-data; name=\"payload\"")
                 .build();
 
-        RequestBody requestBody = RequestBody.create(
-                toJson(contract),
+        RequestBody requestBody = RequestBody.create(toJson(contract),
                 okhttp3.MediaType.get(MediaType.APPLICATION_JSON));
 
         return MultipartBody.Part.create(headers, requestBody);

@@ -14,20 +14,35 @@
 
 package org.eclipse.dataspaceconnector.ids.core;
 
+import de.fraunhofer.iais.eis.ArtifactRequestMessage;
+import de.fraunhofer.iais.eis.ContractAgreementMessage;
+import de.fraunhofer.iais.eis.ContractOfferMessage;
+import de.fraunhofer.iais.eis.ContractRejectionMessage;
+import de.fraunhofer.iais.eis.ContractRequestMessage;
+import de.fraunhofer.iais.eis.DescriptionRequestMessage;
+import de.fraunhofer.iais.eis.DynamicAttributeToken;
+import de.fraunhofer.iais.eis.MessageProcessedNotificationMessage;
+import de.fraunhofer.iais.eis.NotificationMessage;
+import de.fraunhofer.iais.eis.ParticipantUpdateMessage;
+import de.fraunhofer.iais.eis.RejectionMessage;
+import de.fraunhofer.iais.eis.RequestInProcessMessage;
+import de.fraunhofer.iais.eis.TokenFormat;
 import okhttp3.OkHttpClient;
 import org.eclipse.dataspaceconnector.ids.core.descriptor.IdsDescriptorServiceImpl;
-import org.eclipse.dataspaceconnector.ids.core.serialization.ObjectMapperFactory;
+import org.eclipse.dataspaceconnector.ids.core.serialization.IdsConstraintImpl;
 import org.eclipse.dataspaceconnector.ids.core.service.CatalogServiceImpl;
 import org.eclipse.dataspaceconnector.ids.core.service.ConnectorServiceImpl;
 import org.eclipse.dataspaceconnector.ids.core.service.ConnectorServiceSettings;
 import org.eclipse.dataspaceconnector.ids.core.transform.IdsTransformerRegistryImpl;
-import org.eclipse.dataspaceconnector.ids.spi.IdsId;
 import org.eclipse.dataspaceconnector.ids.spi.IdsIdParser;
 import org.eclipse.dataspaceconnector.ids.spi.IdsType;
 import org.eclipse.dataspaceconnector.ids.spi.descriptor.IdsDescriptorService;
+import org.eclipse.dataspaceconnector.ids.spi.domain.DefaultValues;
 import org.eclipse.dataspaceconnector.ids.spi.service.CatalogService;
 import org.eclipse.dataspaceconnector.ids.spi.service.ConnectorService;
 import org.eclipse.dataspaceconnector.ids.spi.transform.IdsTransformerRegistry;
+import org.eclipse.dataspaceconnector.serializer.JsonLdSerializationService;
+import org.eclipse.dataspaceconnector.serializer.JsonLdSerializer;
 import org.eclipse.dataspaceconnector.spi.EdcException;
 import org.eclipse.dataspaceconnector.spi.EdcSetting;
 import org.eclipse.dataspaceconnector.spi.contract.offer.ContractOfferService;
@@ -45,7 +60,7 @@ import java.util.List;
  * Implements the IDS Controller REST API.
  */
 @Provides({ CatalogService.class, ConnectorService.class, IdsDescriptorService.class,
-        CatalogService.class, ConnectorService.class, IdsTransformerRegistry.class, ObjectMapperFactory.class })
+        CatalogService.class, ConnectorService.class, IdsTransformerRegistry.class })
 public class IdsCoreServiceExtension implements ServiceExtension {
 
     @EdcSetting
@@ -57,10 +72,13 @@ public class IdsCoreServiceExtension implements ServiceExtension {
     private static final String ERROR_INVALID_SETTING = "IDS Settings: Invalid setting for '%s'. Was %s'.";
 
     private Monitor monitor;
+
     @Inject
     private ContractOfferService contractOfferService;
+
     @Inject
     private IdentityService identityService;
+
     @Inject
     private OkHttpClient okHttpClient;
 
@@ -70,21 +88,23 @@ public class IdsCoreServiceExtension implements ServiceExtension {
     }
 
     @Override
-    public void initialize(ServiceExtensionContext serviceExtensionContext) {
-        monitor = serviceExtensionContext.getMonitor();
+    public void initialize(ServiceExtensionContext context) {
+        monitor = context.getMonitor();
+
+        customizeTypeManager(context);
 
         List<String> settingErrors = new ArrayList<>();
         ConnectorServiceSettings connectorServiceSettings = null;
         String dataCatalogId = null;
 
         try {
-            connectorServiceSettings = new ConnectorServiceSettings(serviceExtensionContext, monitor);
+            connectorServiceSettings = new ConnectorServiceSettings(context, monitor);
         } catch (EdcException e) {
             settingErrors.add(e.getMessage());
         }
 
         try {
-            dataCatalogId = resolveCatalogId(serviceExtensionContext);
+            dataCatalogId = resolveCatalogId(context);
         } catch (EdcException e) {
             settingErrors.add(e.getMessage());
         }
@@ -93,60 +113,27 @@ public class IdsCoreServiceExtension implements ServiceExtension {
             throw new EdcException(String.join(", ", settingErrors));
         }
 
-        IdsTransformerRegistry transformerRegistry = createTransformerRegistry();
-        serviceExtensionContext.registerService(IdsTransformerRegistry.class, transformerRegistry);
+        context.registerService(IdsTransformerRegistry.class, new IdsTransformerRegistryImpl());
 
-        CatalogService dataCatalogService = createDataCatalogService(dataCatalogId, contractOfferService);
+        var dataCatalogService = new CatalogServiceImpl(monitor, dataCatalogId, contractOfferService);
+        context.registerService(CatalogService.class, dataCatalogService);
 
-        serviceExtensionContext.registerService(CatalogService.class, dataCatalogService);
+        var connectorService = new ConnectorServiceImpl(monitor, connectorServiceSettings, dataCatalogService);
+        context.registerService(ConnectorService.class, connectorService);
 
-        ConnectorService connectorService = createConnectorService(connectorServiceSettings,
-                dataCatalogService);
-        serviceExtensionContext.registerService(ConnectorService.class, connectorService);
-
-        //TODO remove once IDS serializer is integrated (#236)
-        var objectMapperFactory = new ObjectMapperFactory();
-        serviceExtensionContext.registerService(ObjectMapperFactory.class, objectMapperFactory);
-
-        registerOther(serviceExtensionContext);
+        context.registerService(IdsDescriptorService.class, new IdsDescriptorServiceImpl());
     }
 
-    private void registerOther(ServiceExtensionContext context) {
-        var descriptorService = new IdsDescriptorServiceImpl();
-        context.registerService(IdsDescriptorService.class, descriptorService);
-    }
-
-    private IdsTransformerRegistry createTransformerRegistry() {
-        return new IdsTransformerRegistryImpl();
-    }
-
-    private CatalogService createDataCatalogService(
-            String dataCatalogId,
-            ContractOfferService contractOfferService) {
-        return new CatalogServiceImpl(
-                monitor,
-                dataCatalogId,
-                contractOfferService
-        );
-    }
-
-    private ConnectorService createConnectorService(
-            ConnectorServiceSettings connectorServiceSettings,
-            CatalogService dataCatalogService) {
-        return new ConnectorServiceImpl(monitor, connectorServiceSettings, dataCatalogService);
-    }
-
-    private String resolveCatalogId(ServiceExtensionContext serviceExtensionContext) {
-        String value = serviceExtensionContext.getSetting(EDC_IDS_CATALOG_ID, null);
-
+    private String resolveCatalogId(ServiceExtensionContext context) {
+        var value = context.getSetting(EDC_IDS_CATALOG_ID, null);
         if (value == null) {
             monitor.warning(String.format(WARNING_USING_DEFAULT_SETTING, EDC_IDS_CATALOG_ID, DEFAULT_EDC_IDS_CATALOG_ID));
             value = DEFAULT_EDC_IDS_CATALOG_ID;
         }
 
         try {
-            // Hint: use stringified uri to keep uri path and query
-            IdsId idsId = IdsIdParser.parse(value);
+            // use stringified uri to keep uri path and query
+            var idsId = IdsIdParser.parse(value);
             if (idsId.getType() == IdsType.CATALOG) {
                 return idsId.getValue();
             } else {
@@ -155,5 +142,34 @@ public class IdsCoreServiceExtension implements ServiceExtension {
         } catch (IllegalArgumentException e) {
             throw new EdcException(String.format(ERROR_INVALID_SETTING, EDC_IDS_CATALOG_ID, value));
         }
+    }
+
+    private void customizeTypeManager(ServiceExtensionContext context) {
+        var typeManager = context.getTypeManager();
+
+        var customMapper = JsonLdSerializationService.getObjectMapper();
+
+        // register custom object mapper
+        typeManager.registerContext("ids", customMapper);
+
+        // register custom IDS constraint serializer
+        typeManager.registerTypes("ids", IdsConstraintImpl.class);
+
+        // register serializer for used IDS objects
+        typeManager.registerSerializer("ids", ArtifactRequestMessage.class, new JsonLdSerializer<>(ArtifactRequestMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", RequestInProcessMessage.class, new JsonLdSerializer<>(RequestInProcessMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", MessageProcessedNotificationMessage.class, new JsonLdSerializer<>(MessageProcessedNotificationMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", DescriptionRequestMessage.class, new JsonLdSerializer<>(DescriptionRequestMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", NotificationMessage.class, new JsonLdSerializer<>(NotificationMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", ParticipantUpdateMessage.class, new JsonLdSerializer<>(ParticipantUpdateMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", RejectionMessage.class, new JsonLdSerializer<>(RejectionMessage.class, DefaultValues.CONTEXT));
+
+        typeManager.registerSerializer("ids", ContractAgreementMessage.class, new JsonLdSerializer<>(ContractAgreementMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", ContractRejectionMessage.class, new JsonLdSerializer<>(ContractRejectionMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", ContractOfferMessage.class, new JsonLdSerializer<>(ContractOfferMessage.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", ContractRequestMessage.class, new JsonLdSerializer<>(ContractRequestMessage.class, DefaultValues.CONTEXT));
+
+        typeManager.registerSerializer("ids", DynamicAttributeToken.class, new JsonLdSerializer<>(DynamicAttributeToken.class, DefaultValues.CONTEXT));
+        typeManager.registerSerializer("ids", TokenFormat.class, new JsonLdSerializer<>(TokenFormat.class, DefaultValues.CONTEXT));
     }
 }
