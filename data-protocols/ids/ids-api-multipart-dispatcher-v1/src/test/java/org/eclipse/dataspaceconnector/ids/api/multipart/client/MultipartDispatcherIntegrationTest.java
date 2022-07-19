@@ -14,6 +14,11 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart.client;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.fraunhofer.iais.eis.Action;
 import de.fraunhofer.iais.eis.BaseConnector;
 import de.fraunhofer.iais.eis.ContractAgreementBuilder;
@@ -27,6 +32,7 @@ import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.Multip
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.MultipartContractOfferSender;
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.MultipartContractRejectionSender;
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.MultipartDescriptionRequestSender;
+import org.eclipse.dataspaceconnector.ids.core.serialization.calendar.XmlGregorianCalendarModule;
 import org.eclipse.dataspaceconnector.ids.core.util.CalendarUtil;
 import org.eclipse.dataspaceconnector.ids.spi.IdsId;
 import org.eclipse.dataspaceconnector.ids.spi.Protocols;
@@ -48,6 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -70,17 +77,25 @@ class MultipartDispatcherIntegrationTest extends AbstractMultipartDispatcherInte
     private static final String CONNECTOR_ID = UUID.randomUUID().toString();
     private IdsTransformerRegistry transformerRegistry;
     private IdsMultipartRemoteMessageDispatcher multipartDispatcher;
+    private ObjectMapper objectMapper;
 
     @BeforeEach
     void init() {
-        Monitor monitor = mock(Monitor.class);
-
         transformerRegistry = mock(IdsTransformerRegistry.class);
 
-        Vault vault = mock(Vault.class);
+        var monitor = mock(Monitor.class);
+        var vault = mock(Vault.class);
         var httpClient = testOkHttpClient();
-
         var idsWebhookAddress = "http://webhook/api";
+
+        objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.registerModule(new XmlGregorianCalendarModule());
+        objectMapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX"));
+        objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        objectMapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
 
         multipartDispatcher = new IdsMultipartRemoteMessageDispatcher();
         multipartDispatcher.register(new MultipartDescriptionRequestSender(CONNECTOR_ID, httpClient, objectMapper, monitor, identityService, transformerRegistry));

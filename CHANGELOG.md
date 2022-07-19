@@ -31,6 +31,7 @@ in the detailed section referring to by linking pull requests or issues.
 * Documentation for `:extensions:data-plane:data-plane-api` (#1579)
 * Allow `TypeManager` to support multiple serialization contexts (#1581)
 * Check response type of IDS multipart messages (#1695)
+* Create JSON-LD serializer extension (#1474)
 
 #### Changed
 
@@ -52,6 +53,7 @@ in the detailed section referring to by linking pull requests or issues.
 * Remove modules `:extensions:transfer-functions:transfer-functions-spi` and `:extensions:transfer-functions:transfer-functions-core` (#1482)
 * Remove `ConnectorVersionProvider`, provide version as static string (#1470)
 * Remove `samples/other/run-from-junit` (#1456)
+* Remove `ObjectMapperFactory` from IDS modules (#1474)
 
 #### Fixed
 

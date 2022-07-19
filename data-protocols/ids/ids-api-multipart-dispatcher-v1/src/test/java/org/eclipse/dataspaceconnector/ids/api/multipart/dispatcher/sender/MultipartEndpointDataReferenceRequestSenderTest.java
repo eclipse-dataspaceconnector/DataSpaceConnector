@@ -14,7 +14,11 @@
 
 package org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import de.fraunhofer.iais.eis.DynamicAttributeToken;
 import de.fraunhofer.iais.eis.DynamicAttributeTokenBuilder;
 import de.fraunhofer.iais.eis.NotificationMessage;
@@ -22,6 +26,7 @@ import de.fraunhofer.iais.eis.NotificationMessageBuilder;
 import de.fraunhofer.iais.eis.ParticipantUpdateMessage;
 import okhttp3.OkHttpClient;
 import org.eclipse.dataspaceconnector.ids.api.multipart.dispatcher.sender.response.IdsMultipartParts;
+import org.eclipse.dataspaceconnector.ids.core.serialization.calendar.XmlGregorianCalendarModule;
 import org.eclipse.dataspaceconnector.ids.spi.transform.IdsTransformerRegistry;
 import org.eclipse.dataspaceconnector.ids.transform.IdsProtocol;
 import org.eclipse.dataspaceconnector.spi.iam.IdentityService;
@@ -33,6 +38,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.text.SimpleDateFormat;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,7 +56,16 @@ class MultipartEndpointDataReferenceRequestSenderTest {
         var monitor = mock(Monitor.class);
         var transformerRegistry = mock(IdsTransformerRegistry.class);
         var identityService = mock(IdentityService.class);
+
         mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.registerModule(new XmlGregorianCalendarModule());
+        mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX"));
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);
+        mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        mapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+
         sender = new MultipartEndpointDataReferenceRequestSender(connectorId, httpClient, mapper, monitor, identityService, transformerRegistry);
     }
 
@@ -73,8 +88,7 @@ class MultipartEndpointDataReferenceRequestSenderTest {
         assertThat(participantUpdateMessage.getSecurityToken()).isEqualTo(datToken);
         assertThat(participantUpdateMessage.getIssuerConnector()).isEqualTo(sender.getConnectorId());
         assertThat(participantUpdateMessage.getSenderAgent()).isEqualTo(sender.getConnectorId());
-        assertThat(participantUpdateMessage.getRecipientAgent())
-                .allMatch(uri -> uri.equals(URI.create(request.getConnectorId())));
+        assertThat(participantUpdateMessage.getRecipientAgent()).allMatch(uri -> uri.equals(URI.create(request.getConnectorId())));
     }
 
     @Test
