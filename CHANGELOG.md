@@ -434,6 +434,7 @@ in the detailed section referring to by linking pull requests or issues.
 * Support IDS logical constraint transformations (#342)
 * Add SQL persistence for contract definitions (#460) (#461)
 * Extra configuration for HttpDataSink (#1480)
+* Add Hashicorp Vault implementation (#1026)
 
 #### Changed
 
