@@ -31,7 +31,7 @@ in the detailed section referring to by linking pull requests or issues.
 
 #### Fixed
 
-*
+* Fixed failure in uploading files to a presigned AWS S3 upload url (#1643)
 
 ## [milestone-5] - 2022-07-21
 
