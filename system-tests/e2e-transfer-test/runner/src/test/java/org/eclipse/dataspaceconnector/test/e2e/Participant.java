@@ -74,7 +74,8 @@ public class Participant {
                         "properties", Map.of(
                                 "name", "transfer-test",
                                 "baseUrl", backendService + "/api/provider/data",
-                                "type", addressType
+                                "type", addressType,
+                                "proxyQueryParams", "true"
                         )
                 )
         );
@@ -170,8 +171,9 @@ public class Participant {
         return contractAgreementId.get();
     }
 
-    public String dataRequest(String contractAgreementId, String assetId, Participant provider, DataAddress dataAddress) {
+    public String dataRequest(String id, String contractAgreementId, String assetId, Participant provider, DataAddress dataAddress) {
         var request = Map.of(
+                "id", id,
                 "contractId", contractAgreementId,
                 "assetId", assetId,
                 "connectorId", "provider",
@@ -264,7 +266,7 @@ public class Participant {
                 put("edc.keystore", resourceAbsolutePath("certs/cert.pfx"));
                 put("edc.keystore.password", "123456");
                 put("ids.webhook.address", idsEndpoint.toString());
-                put("edc.receiver.http.endpoint", backendService + "/api/consumer/pull");
+                put("edc.receiver.http.endpoint", backendService + "/api/consumer/dataReference");
                 put("edc.transfer.proxy.token.signer.privatekey.alias", "1");
                 put("edc.transfer.proxy.token.verifier.publickey.alias", "public-key");
                 put("edc.transfer.proxy.endpoint", dataPlanePublic.toString());

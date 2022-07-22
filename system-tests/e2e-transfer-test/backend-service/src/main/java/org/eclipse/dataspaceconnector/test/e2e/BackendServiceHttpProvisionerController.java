@@ -60,7 +60,8 @@ public class BackendServiceHttpProvisionerController {
                 "contentDataAddress", Map.of(
                         "properties", Map.of(
                                 "type", "HttpData",
-                                "baseUrl", format("http://localhost:%d/api/provider/data", exposedHttpPort)
+                                "baseUrl", format("http://localhost:%d/api/provider/data", exposedHttpPort),
+                                "proxyQueryParams", "true"
                         )
                 ),
                 "apiKeyJwt", "unused",
